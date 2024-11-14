@@ -1,0 +1,5 @@
+# MosDNS Rules
+full:r3p
+full:mi3k
+full:home
+full:smartdns

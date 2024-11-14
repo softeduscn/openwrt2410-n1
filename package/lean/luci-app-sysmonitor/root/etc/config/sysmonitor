@@ -1,0 +1,124 @@
+
+config sysmonitor 'sysmonitor'
+	option enable '1'
+	option ddns '0'
+	option ddnslog '0'
+	option ipaddr '192.168.1.110'
+	option netmask '255.255.255.0'
+	option gateway '192.168.1.1'
+	option vpn 'Passwall'
+	option dns 'NULL'
+	option local_port '6053'
+	option oversea_port '8653'
+	option oversea '-group nocn'
+	option mosdns_port '53'
+	option systime '10'
+	option urlchk '0'
+	option testchk '0'
+	option chkprog '30'
+	option chksys '180'
+	option chktest '120'
+	option prog '15'
+	option shunt '0'
+	option nextvpn '1'
+	option nextvpntime '3'
+	option datalist 'apple-cn'
+	option mosdns_url 'https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release'
+	option firmware 'https://github.com/softeduscn/openwrt2410-n1/releases/download/ARMv8/openwrt_s905d_n1.img.gz'
+
+config host_list
+	option hostname 'R3P'
+	option hostip '192.168.1.119'
+
+config host_list
+	option hostname 'MI3K'
+	option hostip '192.168.1.120'
+	
+config prog_list
+	option enabled '1'
+	option program 'checknode'
+	option cycle '600'
+	option path '/usr/share/sysmonitor/sysapp.sh'
+	option first '180'
+	option name '检测VPN节点'
+
+config prog_list
+	option enabled '1'
+	option program 'cron_regvpn'
+	option cycle '25'
+	option path '/usr/share/sysmonitor/sysapp.sh'
+	option first '5'
+	option name '注册VPN'
+
+config prog_list
+	option enabled '1'
+	option program 'cron_chkvpn'
+	option cycle '60'
+	option path '/usr/share/sysmonitor/sysapp.sh'
+	option first '90'
+	option name '检测VPN'
+
+config prog_list
+	option enabled '1'
+	option program 'pwdata_update'
+	option cycle '240'
+	option path '/usr/share/sysmonitor/sysapp.sh'
+	option first '120'
+	option name '更新Passwall数据'
+
+config prog_list
+	option enabled '1'
+	option program 'mosdns_update'
+	option cycle '300'
+	option path '/usr/share/sysmonitor/sysapp.sh'
+	option first '90'
+	option name '更新MosDNS数据'
+
+config prog_list
+	option enabled '1'
+	option program 'vpnsets'
+	option cycle '200'
+	option path '/usr/share/sysmonitor/sysapp.sh'
+	option first '50'
+	option name '更新VPN地址集'
+
+config data_list
+	option name 'apple-中国列表'
+	option datalist 'apple-cn'
+	option path '/etc/sysmonitor/rule/apple-cn.txt'
+
+config data_list
+	option name 'google-中国列表'
+	option datalist 'google-cn'
+	option path '/etc/sysmonitor/rule/google-cn.txt'
+
+config data_list
+	option name 'gfw列表'
+	option datalist 'gfwlist'
+	option path '/usr/share/passwall/rules/gfwlist'
+
+config data_list
+	option name 'ipv4列表'
+	option datalist 'ipv4'
+	option path '/etc/sysmonitor/rule/ipv4.txt'
+
+config data_list
+	option name 'Cloudflare列表'
+	option datalist 'cfip'
+	option path '/etc/mosdns/rule/cloudflare-cidr.txt'
+
+config data_list
+	option name 'vpn站点列表'
+	option datalist 'vpnsite'
+	option path '/etc/sysmonitor/rule/vpnsite.txt'
+
+config data_list
+	option name 'vpn地址列表'
+	option datalist 'vpnip'
+	option path '/etc/sysmonitor/rule/vpnip.txt'
+
+config data_list
+	option name 'vpn集'
+	option datalist 'vpnsets'
+	option path '/etc/sysmonitor/rule/vpnsets'
+

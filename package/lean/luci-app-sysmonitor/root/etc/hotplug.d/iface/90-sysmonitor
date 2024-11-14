@@ -1,0 +1,3 @@
+[ $INTERFACE = lan6 ] && touch /tmp/ipv6.sign
+[ $INTERFACE = lan ] && touch /tmp/ipv4.sign
+

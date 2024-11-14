@@ -1,0 +1,34 @@
+<style>
+.button1 {-webkit-transition-duration: 0.4s;transition-duration: 0.4s;padding: 1px 3px;text-align: center;background-color: white;color: black;border: 2px solid #4CAF50;border-radius:5px;}.button1:hover {background-color: PeachPuff;color: white;}.button1 {font-size: 11px;}
+.button2 {-webkit-transition-duration: 0.4s;transition-duration: 0.4s;padding: 1px 3px;text-align: center;background-color: red;color: black;border: 2px solid #4CAF50;border-radius:5px;}.button2:hover {background-color: red;color: white;}.button2 {font-size: 11px;}
+.button3 {-webkit-transition-duration: 0.4s;transition-duration: 0.4s;padding: 1px 3px;text-align: center;background-color: dimgray;color: black;border: 2px solid #4CAF50;border-radius:5px;}.button3:hover {background-color: white;color: white;}.button3 {font-size: 11px;}
+.button4 {-webkit-transition-duration: 0.4s;transition-duration: 0.4s;padding: 1px 3px;text-align: center;background-color: white;color: black;border: 2px solid #4CAF50;border-radius:5px;}.button4:hover {background-color: gray;color: white;}.button4 {font-size: 11px;}
+.button5 {-webkit-transition-duration: 0.4s;transition-duration: 0.4s;padding: 1px 3px;text-align: center;background-color: BurlyWood;color: black;border: 2px solid #4CAF50;border-radius:5px;}.button4:hover {background-color: gray;color: white;}.button4 {font-size: 11px;}
+</style>
+<fieldset class="cbi-section">
+	<table width="100%" cellspacing="10" id="_xlnetacc_vpns_status_table">
+		<tr><td width="20%" id="_vpns_title"></td><td id="_vpns_state"></td></tr>
+	</table>
+<BR>
+	<table width="100%" cellspacing="10" id="_xlnetacc_button_status_table">
+		<tr><td width="20%" id="_button_title"></td><td title="" id="_button_state"></td></tr>
+	</table>
+</fieldset>
+<script type="text/javascript">//<![CDATA[
+	var button_state = document.getElementById('_button_state');
+	var button_title = document.getElementById('_button_title');
+	var vpns_state = document.getElementById('_vpns_state');
+	var vpns_title = document.getElementById('_vpns_title');
+	XHR.poll(5, '<%=luci.dispatcher.build_url("admin", "sys", "sysmonitor", "vpns_status")%>', null, function(x, status) {
+		if ( x && x.status == 200 ) {
+			vpns_title.innerHTML ='<em><b>'+status.vpns_title+'</b></em>';
+			vpns_state.innerHTML ='<em><b>'+status.vpns_state+'</b></em>';
+		}
+	});
+	XHR.poll(5, '<%=luci.dispatcher.build_url("admin", "sys", "sysmonitor", "service_button")%>', null, function(x, status) {
+		if ( x && x.status == 200 ) {
+			button_title.innerHTML ='<em><b>'+status.button_title+'</b></em>';
+			button_state.innerHTML ='<em><b>'+status.button_state+'</b></em>';
+		}
+	});
+//]]></script>

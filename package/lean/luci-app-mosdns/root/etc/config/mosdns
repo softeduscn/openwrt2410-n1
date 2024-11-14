@@ -1,0 +1,13 @@
+
+config mosdns 'config'
+	option geo_update_week_time '*'
+	option geo_update_day_time '2'
+	option configfile '/etc/mosdns/config_custom.yaml'
+	option logfile '/tmp/mosdns.log'
+	option cache_survival_time '86400'
+	option geo_auto_update '0'
+	option max_conns '9'
+	option enable_http3 '1'
+	option enabled '1'
+	option geoip_type 'geoip'
+

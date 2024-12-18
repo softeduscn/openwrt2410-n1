@@ -2,9 +2,12 @@ cf.o5o5o.top
 us02.o5o5o.top
 jp81.o5o5o.top
 jp80.o5o5o.top
+de01.o5o5o.top
+hk22.o5o5o.top
 us82.o5o5o.top
 us81.o5o5o.top
 us80.o5o5o.top
+us71.o5o5o.top
 us70.o5o5o.top
 us13.o5o5o.top
 us12.o5o5o.top

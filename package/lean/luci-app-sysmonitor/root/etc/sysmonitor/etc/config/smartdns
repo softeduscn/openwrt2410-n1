@@ -4,14 +4,13 @@ config smartdns
 	option server_name 'smartdns'
 	option tcp_server '1'
 	option port '6053'
-	option prefetch_domain '1'
 	option resolve_local_hostnames '1'
 	option cache_size '5120'
 	option force_https_soa '0'
 	option ipv6_server '1'
 	option bind_device '0'
 	option response_mode 'fastest-response'
-	option serve_expired '1'
+	option serve_expired '0'
 	option cache_persist '0'
 	option auto_set_dnsmasq '0'
 	option doh_server_port '843'
@@ -24,10 +23,11 @@ config smartdns
 	option seconddns_server_group 'oversea'
 	option log_output_mode 'file'
 	option mdns_lookup '1'
-	option speed_check_mode 'none'
-	option rr_ttl_min '30'
-	option rr_ttl_max '600'
-	option rr_ttl_reply_max '20'
+	option speed_check_mode 'tcp:80,tcp:443,ping'
+	option rr_ttl_min '600'
+	option rr_ttl_max '86400'
+	option rr_ttl_reply_max '60'
+	option rr_ttl '600'
 
 config client-rule
 	option enabled '0'
@@ -37,4 +37,3 @@ config client-rule
 config domain-rule
 
 config ip-rule
-

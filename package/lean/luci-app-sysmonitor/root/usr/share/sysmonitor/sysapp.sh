@@ -85,19 +85,20 @@ firstrun(){
 			proxy=$(uci_get_by_name passwall $i Proxy '')
 			vpnname=$(uci get passwall.$i.type)'='$(uci get passwall.$i.remarks)
 			vpnname=$vpnname' proxy='$(uci get passwall.$proxy.type)'-'$(uci get passwall.$proxy.remarks)
-#			echo '204:0.000000 *'$i' '$vpnname>> $file
+			head='204:0.000000'
 		else
 			vpnname=$(uci get passwall.$i.type)'='$(uci get passwall.$i.remarks)
-#			echo '204:0.000001 '$i' '$vpnname>> $file
+			head='204:0.000001'
 		fi
-		echo '204:0.000000 '$i' '$vpnname>> $file
+		echo $head' '$i' '$vpnname>> $file
 	done
 	sed -i '/^$/d' $file
 	sysdir='/etc/sysmonitor'
 	mv $sysdir/fs.lua /usr/lib/lua/luci
 	destdir=''
 	mvdir $sysdir $destdir
-	setdns
+	ntpd -n -q -p ntp.aliyun.com
+	setdns_port
 	echo 0 > /tmp/vpn_status
 	getip
 	uci del network.utun
@@ -293,10 +294,16 @@ getvpn() {
 		status=$(ping_url www.google.com)
 		if [ "$status" != 0 ]; then
 			urlchk=$(uci_get_by_name $NAME $NAME urlchk 0)
-			[ "$urlchk" == 1 ] && status=$(test_url "https://www.google.com/generate_204")
+			if [ "$urlchk" -le 0 ]; then
+				status=$(test_url "https://www.google.com/generate_204")
+				uci_set_by_name $NAME $NAME urlchk 3
+			else
+				urlchk=$((urlchk-1))
+				uci_set_by_name $NAME $NAME urlchk $urlchk
+			fi
 			[ "$status" != 0 ] && status=1
-			testchk=$(uci_get_by_name $NAME $NAME testvpn 0)
-			if [ "$chkvpn" == 1 ]; then
+			testchk=$(uci_get_by_name $NAME $NAME testchk 0)
+			if [ "$testchk" -le 0 ]; then
 				if [ "$status" != 0 ]; then
 					case $vpn in
 						Passwall)
@@ -304,12 +311,16 @@ getvpn() {
 							status=$($APP_PATH/test.sh url_test_node $node)
 							if [ "${status:0:1}" != 0 ]; then
 								status='1'
+								uci_set_by_name $NAME $NAME testchk 6
 							else
 								status=0
 							fi
 							;;
 					esac
 				fi
+			else
+				testchk=$((testchk-1))
+				uci_set_by_name $NAME $NAME testchk $testchk
 			fi
 		fi
 	fi
@@ -400,8 +411,8 @@ setdns() {
 		[ "$dns_port" != '53' ] && set_port=''
 		uci set dhcp.@dnsmasq[0].port=$set_port
 		uci commit dhcp
-		/etc/init.d/odhcpd reload
-		/etc/init.d/dnsmasq reload
+		/etc/init.d/odhcpd restart
+		/etc/init.d/dnsmasq restart
 		uci set smartdns.@smartdns[0].enabled='1'
 		uci set smartdns.@smartdns[0].auto_set_dnsmasq='0'
 		uci set smartdns.@smartdns[0].port=$(uci_get_by_name $NAME $NAME local_port '6053')
@@ -416,7 +427,8 @@ setdns() {
 }
 
 selvpn() {
-	setdns
+	#setdns
+	#setdns_port
 	vpn=$(uci_get_by_name $NAME $NAME vpn 'NULL')
 	case $vpn in
 	WireGuard)
@@ -534,16 +546,6 @@ openclash() {
 	selvpn
 }
 
-dl_smartdnsfile() {
-	num=$(sed -n '/download-file/'p /etc/config/smartdns|wc -l)
-	for((i=0;i<num;i++));  
-	do   
- 		url=$(uci get smartdns.@download-file[$i].url)
-		name=$(uci get smartdns.@download-file[$i].name)
-		wget -O /etc/smartdns/domain-set/$name $url -q
-	done 
-}
-
 reload() {
 	action=1
 	para="reload"
@@ -652,10 +654,10 @@ get_delay() {
 	while (($num<$prog_num))
 	do
 		program=$(uci_get_by_name $NAME @prog_list[$num] program)
-		path=$(uci_get_by_name $NAME @prog_list[$num] path "/usr/share/sysmonitor/sysapp.sh")
-		cycle=$(uci_get_by_name $NAME @prog_list[$num] cycle 5)
-		enabled=$(uci_get_by_name $NAME @prog_list[$num] enabled 0)
 		if [ "$program" == $1 ]; then
+			path=$(uci_get_by_name $NAME @prog_list[$num] path "/usr/share/sysmonitor/sysapp.sh")
+			cycle=$(uci_get_by_name $NAME @prog_list[$num] cycle 5)
+			enabled=$(uci_get_by_name $NAME @prog_list[$num] enabled 0)
 			status=$enabled$cycle'='$path' '$program
 			break
 		fi
@@ -688,13 +690,14 @@ do
 	program=$(uci_get_by_name $NAME @prog_list[$num] program)
 	path=$(uci_get_by_name $NAME @prog_list[$num] path "/usr/share/sysmonitor/sysapp.sh")
 	enabled=$(uci_get_by_name $NAME @prog_list[$num] enabled 0)
-	status=$(cat /tmp/delay.list|grep $program|wc -l)
-	if [ "$status" == 0 ]; then
-		cycle=$(uci_get_by_name $NAME @prog_list[$num] cycle 200)
-		enabled=$(uci_get_by_name $NAME @prog_list[$num] enabled 0)
-		[ "$enabled" == 1 ] && echo $cycle'='$path' '$program >> /tmp/delay.sign
-	else	
-		[ "$enabled" == 0 ] && sed -i "/$program/d" /tmp/delay.list
+	if [ "$enabled" == 1 ]; then
+		status=$(cat /tmp/delay.list|grep $program|wc -l)
+		if [ "$status" == 0 ]; then
+			cycle=$(uci_get_by_name $NAME @prog_list[$num] cycle 200)
+			echo $cycle'='$path' '$program >> /tmp/delay.sign
+		fi
+	else
+		sed -i "/$program/d" /tmp/delay.list
 	fi
 	num=$((num+1))
 done
@@ -917,10 +920,12 @@ proto() {
 		static)
 			uci set network.lan.proto='static'
 			uci del network.lan.dns
-			uci set network.lan.ipaddr=$(uci get sysmonitor.sysmonitor.ipaddr)
+			lanip=$(uci get sysmonitor.sysmonitor.ipaddr)
+			uci set network.lan.ipaddr=$lanip
 			uci set network.lan.netmask=$(uci get sysmonitor.sysmonitor.netmask)
 			uci set network.lan.gateway=$(uci get sysmonitor.sysmonitor.gateway)
-			dnslist=$(uci_get_by_name $NAME $NAME dnslist '192.168.1.1')
+#			dnslist=$lanip' '$(uci_get_by_name $NAME $NAME dnslist '')
+			dnslist=$lanip
 			for i in $dnslist
 			do
 				uci add_list network.lan.dns=$i
@@ -1107,7 +1112,7 @@ sysbutton() {
 			timeid=$(echo $i|cut -d'=' -f1)
 			[ "$timeid" -le 20 ] && color='MediumSeaGreen '
 			[ "$timeid" -le 10 ] && color='Green '
-			[ "$(echo $i|cut -d' ' -f2)" != 'chkprog' ] && button=$button' <font color='$color'>'$i'</font><BR>'
+			button=$button' <font color='$color'>'$i'</font><BR>'
 		done < /tmp/delay.list
 		button=$button'</B>'
 		;;
@@ -1414,19 +1419,20 @@ sysmenu() {
 		close_dns
 		;;
 	restartdns)
-		setdns
+		setdns_port
+		#setdns
 		#dns=$(uci_get_by_name $NAME $NAME dns 'NULL'|tr A-Z a-z)
 		#reload $dns
 		;;
 	service_smartdns)
 		uci set sysmonitor.sysmonitor.dns='SmartDNS'
 		uci commit sysmonitor
-		setdns
+		reload 'smartdns'
 		;;
 	service_mosdns)
 		uci set sysmonitor.sysmonitor.dns='MosDNS'
 		uci commit sysmonitor
-		setdns
+		reload 'mosdns'
 		;;
 	firstVPN)
 		#[ "$(ps |grep -v grep|grep next_vpn|wc -l)" == 0 ] && [ -f /tmp/next_vpn.run ] && rm /tmp/next_vpn.run
@@ -1504,26 +1510,22 @@ get_ip() {
 	else
  		IP=$1
 		#echo "IP is name convert ip!"
-		dnsip=$(ping -4 -c 1 -W 1 $IP|grep from|cut -d' ' -f4|cut -d':' -f1)
-#		if [ ! -n "$dnsip" ]; then
-			#echo "Inull"
-			echo $dnsip
-#		else
-#			#echo "again check"
-#			echo $(get_ip $dnsip)
-#		fi
+		ip4=$(host $IP|grep 'has address'|cut -d' ' -f4)
+		ip6=$(host $IP|grep 'has IPv6 address'|cut -d' ' -f5)
+		echo $ip4' '$ip6
 	fi
 }
-
 
 mosdns_update() {
 	mosdns_dir='/etc/sysmonitor/rule'
 	tmpdir=$(mktemp -d) || exit 1
 	url=$(uci_get_by_name $NAME $NAME mosdns_url)
-	wget -O $tmpdir/apple-cn.txt $url/apple-cn.txt
+	curl -4 -k -o $tmpdir/apple-cn.txt $url/apple-cn.txt
+#	wget -4 --no-check-certificate -O $tmpdir/apple-cn.txt $url/apple-cn.txt
 	if [ $? == 0 ]; then
 		cp $tmpdir/apple-cn.txt $mosdns_dir
-		wget -O $tmpdir/google-cn.txt $url/google-cn.txt
+		curl -4 -k -o $tmpdir/google-cn.txt $url/google-cn.txt
+		#wget -4 --no-check-certificate -O $tmpdir/google-cn.txt $url/google-cn.txt
 		if [ $? == 0 ]; then
 			cp $tmpdir/google-cn.txt $mosdns_dir
 			setdelay_offon mosdns_update
@@ -1578,6 +1580,7 @@ vpnsets() {
 		vpnsets='/etc/sysmonitor/rule/vpnsets'
 		nodes=$(cat /etc/config/passwall|grep "config nodes"|cut -d' ' -f3|sed "s/\'//g")
 		num=0
+		iperror=0
 		[ -f $vpnsets ] && rm $vpnsets
 		for i in $nodes 
 		do
@@ -1592,11 +1595,12 @@ vpnsets() {
 			fi
 			ip=$(check_ip $addr)
 			[ ! -n "$ip" ] && ip=$(get_ip $addr)
+			[ ! -n "$ip" ] && iperror=1		
 			len=$(echo $addr|awk '{print length}')
 			[ "$len" -lt 15 ] && addr=$addr'\t'
 			echo -e $num'\t'$i' '$addr'\t'$ip >> $vpnsets
 		done
-		setdelay_offon vpnsets
+		[ "$iperror" == 0 ] && setdelay_offon vpnsets
 	fi
 	delay_prog vpnsets
 }
@@ -1707,9 +1711,6 @@ pptp)
 wg)
 	wg_users
 	;;
-dl_smartdnsfile)
-	dl_smartdnsfile
-	;;
 next_vpn)
 	next_vpn
 	;;
@@ -1762,28 +1763,26 @@ update_dns_data)
 update_vpn_data)
 	setdelay_offon vpnsets 1
 	;;
-chkprog)
+chk_prog)
 	chk_prog
-	chkprog=$(uci_get_by_name $NAME $NAME chkprog 60)
-	echo $chkprog'='$APP_PATH'/sysapps.sh chkprog' >> /tmp/delay.sign
 	;;
 passwall_start)
 	touch /tmp/passwall_start
 	uci_set_by_name $NAME $NAME dns 'MosDNS'
 	uci commit passwall
-	setdns
+	setdns_port
 	;;
 passwall_end)
 	[ -f /tmp/passwall_start ] && rm /tmp/passwall_start
 	getvpn
 	;;
 test)
-	firstnode=$(get_first_node)
-	echo $firstnode
-exit
-	status=$(test_url "https://www.google.com/generate_204")
-	echo $status
+	testchk=$(uci_get_by_name $NAME $NAME testchk 0)
+	echo 'testchk='$testchk
+	urlchk=$(uci_get_by_name $NAME $NAME urlchk 0)
+	echo 'urlchk='$urlchk
 	exit
+
 	;;
 *)
 	echo "No this function!"

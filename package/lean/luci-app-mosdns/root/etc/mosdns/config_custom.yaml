@@ -32,15 +32,19 @@ plugins:
           dial_addr: "8.8.8.8"
 
         - addr: "tls://dns.google"
-          dial_addr: "8.8.4.4"
-          enable_pipeline: true # TCP/DoT 启用 RFC 7766 新的 query pipelining 连接复用模式
+          dial_addr: "2001:4860:4860::8844"
+          enable_pipeline: true
         - addr: "tls://dns.google"
           dial_addr: "2001:4860:4860::8888"
           enable_pipeline: true
         - addr: "tls://dns.google"
           dial_addr: "8.8.8.8"
           enable_pipeline: true
-        # h3
+        - addr: "tls://dns.google"
+          dial_addr: "8.8.4.4"
+          enable_pipeline: true
+
+     # h3
         - addr: "https://dns.google/dns-query"
           dial_addr: "2001:4860:4860::8844"
           enable_http3: true
@@ -67,7 +71,7 @@ plugins:
         - addr: "https://cloudflare-dns.com/dns-query"
           dial_addr: "2606:4700:4700::1111"
         - addr: "https://cloudflare-dns.com/dns-query"
-          dial_addr: "1.0.0.1"
+          dial_addr: "1.1.1.1"
 
         - addr: "tls://1dot1dot1dot1.cloudflare-dns.com"
           dial_addr: "2606:4700:4700::1001"
@@ -79,7 +83,7 @@ plugins:
           dial_addr: "2606:4700:4700::1111"
           enable_pipeline: true
         - addr: "tls://1dot1dot1dot1.cloudflare-dns.com"
-          dial_addr: "1.0.0.1"
+          dial_addr: "1.1.1.1"
           enable_pipeline: true
 
         - addr: "https://cloudflare-dns.com/dns-query"
@@ -192,13 +196,13 @@ plugins:
       files:
         - "/etc/mosdns/rule/local-ptr.txt"
 
-  # google & apple whitelist域名国内可访问
+  # ddns & vpnsite whitelist域名国内可访问
   - tag: can_cn_site
     type: domain_set
     args:
       files:
-        - "/etc/sysmonitor/rule/apple-cn.txt"
-        - "/etc/sysmonitor/rule/google-cn.txt"
+#        - "/etc/sysmonitor/rule/apple-cn.txt"
+#        - "/etc/sysmonitor/rule/google-cn.txt"
         - "/etc/sysmonitor/rule/vpnsite.txt"
         - "/etc/mosdns/rule/ddnslist.txt"        
         - "/etc/mosdns/rule/whitelist.txt"
@@ -223,7 +227,6 @@ plugins:
     args:
       files:
         - "/var/mosdns/geoip_cn.txt"
-        - "/etc/sysmonitor/rule/vpnip.txt"
 
   # 国外域名
   - tag: geosite_no_cn
@@ -288,7 +291,7 @@ plugins:
     args:
       primary: smartdns # 主dns
       secondary: dnspod # 备用dns
-      threshold: 30
+      threshold: 15
       always_standby: true # 副可执行插件始终待命
 
   # dns-cn 序列
@@ -297,28 +300,8 @@ plugins:
     args:
       primary: smartdns # 主dns
       secondary: ali # 备用dns
-      threshold: 30
+      threshold: 15
       always_standby: true # 副可执行插件始终待命
-
-  # no ecs
-  - tag: no_ecs
-    type: "ecs_handler"
-    args:
-      forward: false # 是否转发来自下游的 ecs
-      preset: "" # 发送预设 ecs
-      send: false # 是否发送 ecs
-      mask4: 24
-      mask6: 48 
-  
-  # 附加 ecs cn 信息
-  - tag: ecs_cn
-    type: "ecs_handler"
-    args:
-      forward: false # 是否转发来自下游的 ecs
-      preset: 114.217.98.237 # 发送预设 ecs
-      send: false # 是否发送 ecs
-      mask4: 24 # ipv4 掩码。默认 24
-      mask6: 48 # ipv6 掩码。默认 48
 
   # 缓存
 #  - tag: lazy_cache
@@ -330,35 +313,14 @@ plugins:
 #      dump_file: "/etc/mosdns/cache.dump"
 #      dump_interval: 600
 
-  # cloudflare IP 优选，需要定期修改，最好填写 2 - 4 个
-  - tag: blackhole_cloudflare
-    type: sequence
-    args:
-      - exec: black_hole 104.19.26.227 104.19.77.161 104.21.238.190
-#      - exec: query_summary cloudflare_best
-      - exec: ttl 3600-0
-      - exec: accept
-
-  - tag: change_cdn_ip
-    type: sequence
-    args:
-      - matches: # cloudflare 优选ip
-          - qtype 1
-          - has_wanted_ans
-          - "resp_ip $geoip_cfip"
-        exec: jump blackhole_cloudflare
-
   # 国内解析
   # 返回非国内 ip 则 drop_resp
   - tag: local_sequence
     type: sequence
     args:
-      - exec: $ecs_cn
       - exec: $smartdns_cn
-#      - exec: jump modify_ttl
-      - matches: "!resp_ip $geoip_cn" # 响应 非cn ip
-        exec: drop_resp # 丢弃
-#      - exec: jump change_cdn_ip
+#      - matches: "!resp_ip $geoip_cn" # 响应 非cn ip
+#        exec: drop_resp # 丢弃
 
   # 国外解析
   # 返回非国外 ip 则 drop_resp
@@ -367,9 +329,8 @@ plugins:
     args:
       - exec: prefer_ipv4    
       - exec: $smartdns_nocn
-      - matches: "resp_ip $geoip_cn" # 响应为 cn ip    
-        exec: drop_resp # 丢弃
-#      - exec: jump change_cdn_ip
+#      - matches: "resp_ip $geoip_cn" # 响应为 cn ip    
+#        exec: drop_resp # 丢弃
 
  # ipv4_domain 解析
   - tag: ipv4_sequence
@@ -377,8 +338,6 @@ plugins:
     args:
       - exec: prefer_ipv4
       - exec: $smartdns_nocn
-#      - matches: "resp_ip $geoip_cn" # 响应为 cn ip    
-#        exec: drop_resp # 丢弃
 
  # 查询国内域名
   - tag: query_is_local_domain
@@ -406,15 +365,16 @@ plugins:
     type: sequence
     args:
       - matches: qname $geosite_gfw
-        exec: $remote_sequence
+#        exec: $remote_sequence
+        exec: $smartdns_nocn
 
- #	google-cn & apple-cn解析
+  # ddns & vpnsite whitelist域名国内可访问
   - tag: query_is_can_cn_domain
     type: sequence
     args:
-      - matches: qtype 255 # TYPE 255 类型|DNS服务器拓展支持
-        exec: $smartdns_cn
-      - matches: qname $can_cn_site # google & apple whitelist域名国内可访问
+#      - matches: qtype 255 # TYPE 255 类型|DNS服务器拓展支持
+#        exec: $smartdns_cn
+      - matches: qname $can_cn_site
         exec: $smartdns_cn
  
   - tag: query_is_reject_domain
@@ -427,8 +387,8 @@ plugins:
 #        - qtype 12
 #        - "qname $local_ptr"
 #        exec: reject 3
-      - matches: qtype 65
-        exec: reject 3
+#      - matches: qtype 65
+#        exec: reject 3
       - matches: "qname keyword::" # 无效域名
         exec: reject 3
 
@@ -450,15 +410,6 @@ plugins:
       - exec: $dns_cn
       - exec: jump has_resp_sequence
 
-  # gfwlist解析出的ip添加至ipset，添加前先判断是否为国内ip或内网ip
-  - tag: gfw-list
-    type: sequence
-    args:
-      - exec: ttl 300-3600
-      - matches: "!resp_ip $geoip_cn"
-        exec: ipset gfwlist,inet,24
-      - exec: accept
-
 # 主要的运行逻辑插件
   # sequence 插件中调用的插件 tag 必须在 sequence 前定义，
   # 否则 sequence 找不到对应插件。
@@ -472,8 +423,11 @@ plugins:
       - exec: $query_is_reject_domain
       - exec: jump has_resp_sequence
 
-      - exec: $query_is_no_local_ipv4_domain  #国外ipv4域名
+      - exec: $query_is_can_cn_domain # ddns & vpnsite whitelist域名国内可访问
       - exec: jump has_resp_sequence
+
+#      - exec: $query_is_no_local_ipv4_domain  #国外ipv4域名
+#      - exec: jump has_resp_sequence
 
       - exec: $query_is_gfw_domain #  GFW域名
       - exec: jump has_resp_sequence
@@ -481,16 +435,11 @@ plugins:
       - exec: $query_is_no_local_domain  #国外域名
       - exec: jump has_resp_sequence
 
-      - exec: $query_is_can_cn_domain # google & apple whitelist域名国内可访问
-      - exec: jump has_resp_sequence
-
       - exec: $query_is_local_domain  #国内域名处理 放在国外前，ai将不能工作(出现所在国不支持)
       - exec: jump has_resp_sequence
 
       - exec: jump fallback
 
-#     - matches: has_resp
- #       exec: goto gfw-list
 
  # 启动 udp 服务器。
   - tag: udp_server

@@ -327,6 +327,23 @@ do
 				}
 			end
 		else
+			--前置代理节点
+			local currentNode = uci:get_all(appname, node_id) or nil
+			if currentNode and currentNode.preproxy_node then
+				CONFIG[#CONFIG + 1] = {
+					log = true,
+					id = node_id,
+					remarks = "节点[" .. node_id .. "]前置代理节点",
+					currentNode = uci:get_all(appname, currentNode.preproxy_node) or nil,
+					set = function(o, server)
+						uci:set(appname, node_id, "preproxy_node", server)
+						o.newNodeId = server
+					end,
+					delete = function(o)
+						uci:delete(appname, node_id, "preproxy_node")
+					end
+				}
+			end
 			--落地节点
 			local currentNode = uci:get_all(appname, node_id) or nil
 			if currentNode and currentNode.to_node then
@@ -442,10 +459,13 @@ local function processData(szType, content, add_mode, add_from)
 		-- result.mux = 1
 		-- result.mux_concurrency = 8
 
-		if not info.net then
-			info.net = "tcp"
-		end
+		if not info.net then info.net = "tcp" end
 		info.net = string.lower(info.net)
+		if result.type == "sing-box" and info.net == "raw" then 
+			info.net = "tcp"
+		elseif result.type == "Xray" and info.net == "tcp" then
+			info.net = "raw"
+		end
 		result.transport = info.net
 		if info.net == 'ws' then
 			result.ws_host = info.host
@@ -470,7 +490,7 @@ local function processData(szType, content, add_mode, add_from)
 			result.h2_host = info.host
 			result.h2_path = info.path
 		end
-		if info.net == 'tcp' then
+		if info.net == 'raw' or info.net == 'tcp' then
 			if info.type and info.type ~= "http" then
 				info.type = "none"
 			end
@@ -497,9 +517,9 @@ local function processData(szType, content, add_mode, add_from)
 		if info.net == 'grpc' then
 			result.grpc_serviceName = info.path
 		end
-		if info.net == 'splithttp' then
-			result.splithttp_host = info.host
-			result.splithttp_path = info.path
+		if info.net == 'xhttp' or info.net == 'splithttp' then
+			result.xhttp_host = info.host
+			result.xhttp_path = info.path
 		end
 		if info.net == 'httpupgrade' then
 			result.httpupgrade_host = info.host
@@ -514,7 +534,7 @@ local function processData(szType, content, add_mode, add_from)
 			result.tls = "0"
 		end
 
-		if result.type == "sing-box" and (result.transport == "mkcp" or result.transport == "splithttp") then
+		if result.type == "sing-box" and (result.transport == "mkcp" or result.transport == "xhttp" or result.transport == "splithttp") then
 			log("跳过节点:" .. result.remarks .."，因Sing-Box不支持" .. szType .. "协议的" .. result.transport .. "传输方式，需更换Xray。")
 			return nil
 		end
@@ -602,7 +622,7 @@ local function processData(szType, content, add_mode, add_from)
 			if ss_type_default == "xray" and has_xray then
 				result.type = 'Xray'
 				result.protocol = 'shadowsocks'
-				result.transport = 'tcp'
+				result.transport = 'raw'
 			end
 			if ss_type_default == "sing-box" and has_singbox then
 				result.type = 'sing-box'
@@ -643,6 +663,11 @@ local function processData(szType, content, add_mode, add_from)
 
 			if params.type then
 				params.type = string.lower(params.type)
+				if result.type == "sing-box" and params.type == "raw" then 
+					params.type = "tcp"
+				elseif result.type == "Xray" and params.type == "tcp" then
+					params.type = "raw"
+				end
 				result.transport = params.type
 				if result.type ~= "SS-Rust" and result.type ~= "SS" then
 					if params.type == 'ws' then
@@ -675,7 +700,7 @@ local function processData(szType, content, add_mode, add_from)
 							result.h2_path = params.path
 						end
 					end
-					if params.type == 'tcp' then
+					if params.type == 'raw' or params.type == 'tcp' then
 						result.tcp_guise = params.headerType or "none"
 						result.tcp_guise_http_host = params.host
 						result.tcp_guise_http_path = params.path
@@ -699,7 +724,7 @@ local function processData(szType, content, add_mode, add_from)
 					if params.type == 'grpc' then
 						if params.path then result.grpc_serviceName = params.path end
 						if params.serviceName then result.grpc_serviceName = params.serviceName end
-						result.grpc_mode = params.mode
+						result.grpc_mode = params.mode or "gun"
 					end
 					result.tls = "0"
 					if params.security == "tls" or params.security == "reality" then
@@ -783,10 +808,13 @@ local function processData(szType, content, add_mode, add_from)
 				result.tls_allowInsecure = allowInsecure_default and "1" or "0"
 			end
 
-			if not params.type then
-				params.type = "tcp"
-			end
+			if not params.type then params.type = "tcp" end
 			params.type = string.lower(params.type)
+			if result.type == "sing-box" and params.type == "raw" then 
+				params.type = "tcp"
+			elseif result.type == "Xray" and params.type == "tcp" then
+				params.type = "raw"
+			end
 			result.transport = params.type
 			if params.type == 'ws' then
 				result.ws_host = params.host
@@ -818,7 +846,7 @@ local function processData(szType, content, add_mode, add_from)
 					result.h2_path = params.path
 				end
 			end
-			if params.type == 'tcp' then
+			if params.type == 'raw' or params.type == 'tcp' then
 				result.tcp_guise = params.headerType or "none"
 				result.tcp_guise_http_host = params.host
 				result.tcp_guise_http_path = params.path
@@ -842,11 +870,11 @@ local function processData(szType, content, add_mode, add_from)
 			if params.type == 'grpc' then
 				if params.path then result.grpc_serviceName = params.path end
 				if params.serviceName then result.grpc_serviceName = params.serviceName end
-				result.grpc_mode = params.mode
+				result.grpc_mode = params.mode or "gun"
 			end
-			if params.type == 'splithttp' then
-				result.splithttp_host = params.host
-				result.splithttp_path = params.path
+			if params.type == 'xhttp' or params.type == 'splithttp' then
+				result.xhttp_host = params.host
+				result.xhttp_path = params.path
 			end
 			if params.type == 'httpupgrade' then
 				result.httpupgrade_host = params.host
@@ -857,7 +885,7 @@ local function processData(szType, content, add_mode, add_from)
 
 			result.flow = params.flow or nil
 
-			if result.type == "sing-box" and (result.transport == "mkcp" or result.transport == "splithttp") then
+			if result.type == "sing-box" and (result.transport == "mkcp" or result.transport == "xhttp" or result.transport == "splithttp") then
 				log("跳过节点:" .. result.remarks .."，因Sing-Box不支持" .. szType .. "协议的" .. result.transport .. "传输方式，需更换Xray。")
 				return nil
 			end
@@ -920,10 +948,13 @@ local function processData(szType, content, add_mode, add_from)
 				result.address = host_port
 			end
 
-			if not params.type then
-				params.type = "tcp"
-			end
+			if not params.type then params.type = "tcp" end
 			params.type = string.lower(params.type)
+			if result.type == "sing-box" and params.type == "raw" then 
+				params.type = "tcp"
+			elseif result.type == "Xray" and params.type == "tcp" then
+				params.type = "raw"
+			end
 			result.transport = params.type
 			if params.type == 'ws' then
 				result.ws_host = params.host
@@ -955,7 +986,7 @@ local function processData(szType, content, add_mode, add_from)
 					result.h2_path = params.path
 				end
 			end
-			if params.type == 'tcp' then
+			if params.type == 'raw' or params.type == 'tcp' then
 				result.tcp_guise = params.headerType or "none"
 				result.tcp_guise_http_host = params.host
 				result.tcp_guise_http_path = params.path
@@ -979,11 +1010,21 @@ local function processData(szType, content, add_mode, add_from)
 			if params.type == 'grpc' then
 				if params.path then result.grpc_serviceName = params.path end
 				if params.serviceName then result.grpc_serviceName = params.serviceName end
-				result.grpc_mode = params.mode
+				result.grpc_mode = params.mode or "gun"
 			end
-			if params.type == 'splithttp' then
-				result.splithttp_host = params.host
-				result.splithttp_path = params.path
+			if params.type == 'xhttp' or params.type == 'splithttp' then
+				result.xhttp_host = params.host
+				result.xhttp_path = params.path
+				result.xhttp_mode = params.mode or "auto"
+				result.xhttp_extra = params.extra
+				local success, Data = pcall(jsonParse, params.extra)
+				if success and Data then
+					local address = (Data.extra and Data.extra.downloadSettings and Data.extra.downloadSettings.address)
+							or (Data.downloadSettings and Data.downloadSettings.address)
+					result.download_address = address and address ~= "" and address or nil
+				else
+					result.download_address = nil
+				end
 			end
 			if params.type == 'httpupgrade' then
 				result.httpupgrade_host = params.host
@@ -1011,7 +1052,7 @@ local function processData(szType, content, add_mode, add_from)
 			result.port = port
 			result.tls_allowInsecure = allowInsecure_default and "1" or "0"
 
-			if result.type == "sing-box" and (result.transport == "mkcp" or result.transport == "splithttp") then
+			if result.type == "sing-box" and (result.transport == "mkcp" or result.transport == "xhttp" or result.transport == "splithttp") then
 				log("跳过节点:" .. result.remarks .."，因Sing-Box不支持" .. szType .. "协议的" .. result.transport .. "传输方式，需更换Xray。")
 				return nil
 			end
@@ -1192,12 +1233,19 @@ local function processData(szType, content, add_mode, add_from)
 	return result
 end
 
-local function curl(url, file, ua)
+local function curl(url, file, ua, mode)
 	local curl_args = api.clone(api.curl_args)
 	if ua and ua ~= "" and ua ~= "curl" then
 		table.insert(curl_args, '--user-agent "' .. ua .. '"')
 	end
-	local return_code, result = api.curl_logic(url, file, curl_args)
+	local return_code
+	if mode == "direct" then
+		return_code = api.curl_direct(url, file, curl_args)
+	elseif mode == "proxy" then
+		return_code = api.curl_proxy(url, file, curl_args)
+	else
+		return_code = api.curl_auto(url, file, curl_args)
+	end
 	return return_code
 end
 
@@ -1586,8 +1634,10 @@ local execute = function()
 				domain_strategy_node = domain_strategy_default
 			end
 			local ua = value.user_agent
-			log('正在订阅:【' .. remark .. '】' .. url)
-			local raw = curl(url, "/tmp/" .. cfgid, ua)
+			local access_mode = value.access_mode
+			local result = (not access_mode) and "自动" or (access_mode == "direct" and "直连访问" or (access_mode == "proxy" and "通过代理" or "自动"))
+			log('正在订阅:【' .. remark .. '】' .. url .. ' [' .. result .. ']')
+			local raw = curl(url, "/tmp/" .. cfgid, ua, access_mode)
 			if raw == 0 then
 				local f = io.open("/tmp/" .. cfgid, "r")
 				local stdout = f:read("*all")

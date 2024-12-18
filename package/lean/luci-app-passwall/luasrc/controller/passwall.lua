@@ -77,6 +77,11 @@ function index()
 	entry({"admin", "services", appname, "delete_select_nodes"}, call("delete_select_nodes")).leaf = true
 	entry({"admin", "services", appname, "update_rules"}, call("update_rules")).leaf = true
 
+	--[[rule_list]]
+	entry({"admin", "services", appname, "read_gfwlist"}, call("read_rulelist", "gfw")).leaf = true
+	entry({"admin", "services", appname, "read_chnlist"}, call("read_rulelist", "chn")).leaf = true
+	entry({"admin", "services", appname, "read_chnroute"}, call("read_rulelist", "chnroute")).leaf = true
+
 	--[[Components update]]
 	entry({"admin", "services", appname, "check_passwall"}, call("app_check")).leaf = true
 	local coms = require "luci.passwall.com"
@@ -161,13 +166,13 @@ end
 function get_now_use_node()
 	local path = "/tmp/etc/passwall/acl/default"
 	local e = {}
-	local data, code, msg = nixio.fs.readfile(path .. "/TCP.id")
-	if data then
-		e["TCP"] = util.trim(data)
+	local tcp_node = api.get_cache_var("GLOBAL_TCP_node")
+	if tcp_node then
+		e["TCP"] = tcp_node
 	end
-	local data, code, msg = nixio.fs.readfile(path .. "/UDP.id")
-	if data then
-		e["UDP"] = util.trim(data)
+	local udp_node = api.get_cache_var("GLOBAL_UDP_node")
+	if udp_node then
+		e["UDP"] = udp_node
 	end
 	luci.http.prepare_content("application/json")
 	luci.http.write_json(e)
@@ -213,7 +218,15 @@ end
 
 function index_status()
 	local e = {}
-	e.dns_mode_status = luci.sys.call("netstat -apn | grep ':15353 ' >/dev/null") == 0
+	local dns_shunt = uci:get(appname, "@global[0]", "dns_shunt") or "dnsmasq"
+	if dns_shunt == "smartdns" then
+		e.dns_mode_status = luci.sys.call("pidof smartdns >/dev/null") == 0
+	elseif dns_shunt == "chinadns-ng" then
+		e.dns_mode_status = luci.sys.call("/bin/busybox top -bn1 | grep -v 'grep' | grep '/tmp/etc/passwall/bin/' | grep 'default' | grep 'chinadns_ng' >/dev/null") == 0
+	else
+		e.dns_mode_status = luci.sys.call("netstat -apn | grep ':15353 ' >/dev/null") == 0
+	end
+
 	e.haproxy_status = luci.sys.call(string.format("/bin/busybox top -bn1 | grep -v grep | grep '%s/bin/' | grep haproxy >/dev/null", appname)) == 0
 	e["tcp_node_status"] = luci.sys.call("/bin/busybox top -bn1 | grep -v 'grep' | grep '/tmp/etc/passwall/bin/' | grep 'default' | grep 'TCP' >/dev/null") == 0
 
@@ -253,19 +266,17 @@ function connect_status()
 	e.use_time = ""
 	local url = luci.http.formvalue("url")
 	local baidu = string.find(url, "baidu")
-	local enabled = uci:get(appname, "@global[0]", "enabled") or "0"
 	local chn_list = uci:get(appname, "@global[0]", "chn_list") or "direct"
 	local gfw_list = uci:get(appname, "@global[0]", "use_gfw_list") or "1"
 	local proxy_mode = uci:get(appname, "@global[0]", "tcp_proxy_mode") or "proxy"
-	local socks_port = uci:get(appname, "@global[0]", "tcp_node_socks_port") or "1070"
-	local local_proxy = uci:get(appname, "@global[0]", "localhost_proxy") or "1"
-	if enabled == "1" and local_proxy == "0" then
+	local socks_server = api.get_cache_var("GLOBAL_TCP_SOCKS_server")
+	if socks_server and socks_server ~= "" then
 		if (chn_list == "proxy" and gfw_list == "0" and proxy_mode ~= "proxy" and baidu ~= nil) or (chn_list == "0" and gfw_list == "0" and proxy_mode == "proxy") then
 		-- 中国列表+百度 or 全局
-			url = "-x socks5h://127.0.0.1:" .. socks_port .. " " .. url
+			url = "-x socks5h://" .. socks_server .. " " .. url
 		elseif baidu == nil then
 		-- 其他代理模式+百度以外网站
-			url = "-x socks5h://127.0.0.1:" .. socks_port .. " " .. url
+			url = "-x socks5h://" .. socks_server .. " " .. url
 		end
 	end
 	local result = luci.sys.exec('curl --connect-timeout 3 -o /dev/null -I -sk -w "%{http_code}:%{time_appconnect}" ' .. url)
@@ -363,8 +374,8 @@ function clear_all_nodes()
 		uci:delete(appname, t[".name"])
 	end)
 	uci:foreach(appname, "acl_rule", function(t)
-		uci:set(appname, t[".name"], "tcp_node", "default")
-		uci:set(appname, t[".name"], "udp_node", "default")
+		uci:set(appname, t[".name"], "tcp_node", "nil")
+		uci:set(appname, t[".name"], "udp_node", "nil")
 	end)
 	uci:foreach(appname, "nodes", function(node)
 		uci:delete(appname, node['.name'])
@@ -402,10 +413,20 @@ function delete_select_nodes()
 		end)
 		uci:foreach(appname, "acl_rule", function(t)
 			if t["tcp_node"] == w then
-				uci:set(appname, t[".name"], "tcp_node", "default")
+				uci:set(appname, t[".name"], "tcp_node", "nil")
 			end
 			if t["udp_node"] == w then
-				uci:set(appname, t[".name"], "udp_node", "default")
+				uci:set(appname, t[".name"], "udp_node", "nil")
+			end
+		end)
+		uci:foreach(appname, "nodes", function(t)
+			if t["preproxy_node"] == w then
+				uci:delete(appname, t[".name"], "preproxy_node")
+				uci:delete(appname, t[".name"], "chain_proxy")
+			end
+			if t["to_node"] == w then
+				uci:delete(appname, t[".name"], "to_node")
+				uci:delete(appname, t[".name"], "chain_proxy")
 			end
 		end)
 		uci:delete(appname, w)
@@ -469,3 +490,19 @@ function com_update(comname)
 
 	http_write_json(json)
 end
+
+function read_rulelist(list)
+	local rule_path
+	if list == "gfw" then
+		rule_path = "/usr/share/passwall/rules/gfwlist"
+	elseif list == "chn" then
+		rule_path = "/usr/share/passwall/rules/chnlist"
+	else
+		rule_path = "/usr/share/passwall/rules/chnroute"
+	end
+	if api.fs.access(rule_path) then
+		luci.http.prepare_content("text/plain")
+		luci.http.write(api.fs.readfile(rule_path))
+	end
+end
+

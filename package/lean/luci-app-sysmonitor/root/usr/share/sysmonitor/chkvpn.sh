@@ -62,7 +62,6 @@ do
 	fi
 	num=$((num+1))
 done
-echo '60='$APP_PATH'/sysapps.sh chkprog' >> /tmp/delay.list
 echo "15=ntpd -n -q -p ntp.aliyun.com" >> /tmp/delay.sign
 echo "30=touch /tmp/set_static.sign" >> /tmp/delay.sign
 [ -f /tmp/firstrun ] && rm /tmp/firstrun
@@ -74,8 +73,15 @@ syspid=$((syspid+1))
 echo $syspid > /tmp/chkvpn.pid
 chknum=0
 chksys=0
+chkprog=0
 while [ "1" == "1" ]; do
 	chknum=$((chknum+1))
+	chkprog=$((chkprog+1))
+	[ -f /tmp/firstrun ] && run_prog
+	if [ "$chkprog" -ge $(uci_get_by_name $NAME $NAME chkprog 60) ]; then
+		chkprog=0
+		$APP_PATH/sysapp.sh chk_prog
+	fi
 	touch /tmp/test.chkvpn
 	prog='sysmonitor'
 	for i in $prog
@@ -128,11 +134,6 @@ while [ "1" == "1" ]; do
 				;;
 		esac
 	done
-	if [ -f /tmp/firstrun ]; then
-		run_prog
-	else
-		[ $(cat /tmp/delay.list|grep chkprog|wc -l) == 0 ] && $APP_PATH/sysapp.sh chkprog
-	fi
 	if [ -f /tmp/delay.sign ]; then
 		while read i
 		do

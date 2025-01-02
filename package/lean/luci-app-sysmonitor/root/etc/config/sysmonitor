@@ -24,7 +24,7 @@ config sysmonitor 'sysmonitor'
 	option nextvpntime '3'
 	option datalist 'apple-cn'
 	option mosdns_url 'https://gh-proxy.com/raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release'
-	option firmware 'https://gh-proxy.com/github.com/softeduscn/openwrt2410-n1/releases/download/ARMv8/openwrt_s905d_n1.img.gz'
+	option firmware 'https://github.com/softeduscn/openwrt-n1/releases/download/ARMv8/openwrt_s905d_n1.img.gz'
 
 config host_list
 	option hostname 'R3P'

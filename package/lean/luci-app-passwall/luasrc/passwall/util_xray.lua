@@ -1,6 +1,6 @@
 module("luci.passwall.util_xray", package.seeall)
 local api = require "luci.passwall.api"
-local uci = api.libuci
+local uci = api.uci
 local sys = api.sys
 local jsonc = api.jsonc
 local appname = "passwall"
@@ -537,9 +537,7 @@ function gen_config_server(node)
 			config.inbounds[1].streamSettings.realitySettings = {
 				show = false,
 				dest = node.reality_dest,
-				serverNames = {
-					node.reality_serverNames
-				},
+				serverNames = node.reality_serverNames or {},
 				privateKey = node.reality_private_key,
 				shortIds = node.reality_shortId or ""
 			} or nil

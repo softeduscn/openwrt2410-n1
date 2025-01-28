@@ -1100,7 +1100,7 @@ sysbutton() {
 		do
 			program=$(uci get sysmonitor.@prog_list[$num].program)
 			name=$(uci get sysmonitor.@prog_list[$num].name)
-			button=$button' <button class=button1><a href="sysmenu?sys='$program'&sys1=&redir=prog">'$name'</a></button>'
+			button=$button' <button title='$name' class=button1><a href="sysmenu?sys='$program'&sys1=&redir=prog">'$name'</a></button>'
 			num=$((num+1))
 		done
 		;;
@@ -1128,7 +1128,7 @@ sysbutton() {
 			datalist=$(uci_get_by_name $NAME @data_list[$num] datalist)
 			color='button1'
 			[ "$data_list" == $datalist ] && color='button3'
-			button=$button' <button class="'$color'"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=datalist&sys1='$datalist'&redir=data">'$name'</a></button>'
+			button=$button' <button title='$name' class="'$color'"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=datalist&sys1='$datalist'&redir=data">'$name'</a></button>'
 			num=$((num+1))
 		done
 		;;
@@ -1137,10 +1137,10 @@ sysbutton() {
 		nodenums=$(cat /tmp/nodeinfo|wc -l)
 		nodenum=$(sed -n /$vpn/= /tmp/nodeinfo)
 		name=$(getdelay checknode name)
-		button=$button'<button class="button1" title="Update VPN nodes"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=checknode&sys1=&redir=prog">'$name'('$nodenum'-'$nodenums')</a></button>'
+		button=$button'<button class="button1" title="'$name'"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=checknode&sys1=&redir=prog">'$name'('$nodenum'-'$nodenums')</a></button>'
 		vpns=$(cat /tmp/vpns)
 		type=$(echo ${vpns:1}|cut -d'-' -f2|cut -d' ' -f1|tr A-Z a-z)
-		button=$button' <button class="button1" title="Goto VPN setting"><a href="/cgi-bin/luci/admin/services/'$type'" target="_blank">'$type'-></a></button><BR><BR>'
+		button=$button' <button class="button1" title="Goto '$type' setting"><a href="/cgi-bin/luci/admin/services/'$type'" target="_blank">'$type'-></a></button><BR><BR>'
 		redir='node'
 		num=101
 		while read i
@@ -1157,7 +1157,7 @@ sysbutton() {
 					myshunt='启用分流总节点'
 					mybox=' <input type="checkbox" />'
 				fi
-				link=$link' '$mybox' <button class="button1" title="Set shunt mode"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=shunt&sys1=&redir=node">'$myshunt'</a></button>'	
+				link=$link' '$mybox' <button class="button1" title="'$myshunt'"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=shunt&sys1=&redir=node">'$myshunt'</a></button>'	
 			fi
 			if [ "$vpn" == $node ]; then
 				color='green'
@@ -1782,7 +1782,6 @@ test)
 	urlchk=$(uci_get_by_name $NAME $NAME urlchk 0)
 	echo 'urlchk='$urlchk
 	exit
-
 	;;
 *)
 	echo "No this function!"

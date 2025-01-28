@@ -27,7 +27,7 @@ end
 
 --s.description = '<button class="button1" title="Set switch VPN mode"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=VPNswitch&sys1=&redir=node">'..translate(check)..'</a></button>'..box..' <button class="button1" title="Set URL check VPN mode"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=URLchkVPN&sys1=&redir=node">'..translate(checkvpn)..'</a></button>'..vpn..' <button class="button1" title="Set TEST check VPN mode"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=TESTchkVPN&sys1=&redir=node">'..translate(testcheckvpn)..'</a></button>'..testvpn
 
-s.description = '<button class="button1" title="Set switch VPN mode"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=VPNswitch&sys1=&redir=node">'..translate(check)..'</a></button>'..box
+s.description = '<button class="button1" title="'..translate(check)..'"><a href="/cgi-bin/luci/admin/sys/sysmonitor/sysmenu?sys=VPNswitch&sys1=&redir=node">'..translate(check)..'</a></button>'..box
 s.anonymous = true
 
 f = SimpleForm("sysmonitor")
